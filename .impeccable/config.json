@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "app/globals.css"
+        ],
+        "createdAt": "2026-10-10T17:39:18.632Z",
+        "reason": "PRD section 9 (user's spec) calls for a purple-pink gradient brand; .text-gradient is used only on the Dare Battles wordmark"
+      }
+    ]
+  }
+}

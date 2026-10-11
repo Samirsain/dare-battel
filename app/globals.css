@@ -1,0 +1,193 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-pink: #ff3d9a;
+  --color-hot: #ff2e88;
+  --color-purple: #a855f7;
+  --color-gold: #fbbf24;
+  --color-mint: #22c55e;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #fff7fb;
+  --foreground: #3a1f4d;
+  --card: rgb(255 255 255 / 0.8);
+  --card-foreground: #3a1f4d;
+  --popover: #ffffff;
+  --popover-foreground: #3a1f4d;
+  --primary: #ff3d9a;
+  --primary-foreground: #ffffff;
+  --secondary: #f6eefc;
+  --secondary-foreground: #3a1f4d;
+  --muted: #f6eefc;
+  --muted-foreground: #6f5584;
+  --accent: #fde7f3;
+  --accent-foreground: #3a1f4d;
+  --destructive: #e11d48;
+  --border: #f1e3f5;
+  --input: #ead9f2;
+  --ring: #ff3d9a;
+  --chart-1: #ff3d9a;
+  --chart-2: #a855f7;
+  --chart-3: #fbbf24;
+  --chart-4: #22c55e;
+  --chart-5: #38bdf8;
+  --radius: 1rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #3a1f4d;
+  --sidebar-primary: #ff3d9a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fde7f3;
+  --sidebar-accent-foreground: #3a1f4d;
+  --sidebar-border: #f1e3f5;
+  --sidebar-ring: #ff3d9a;
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation; /* no double-tap zoom delay on game buttons */
+}
+
+::selection {
+  background: rgb(255 61 154 / 0.22);
+  color: var(--foreground);
+}
+
+input,
+textarea {
+  caret-color: var(--primary);
+}
+
+button,
+[role="button"],
+label[for],
+img {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Installed app: no rubber-band pull that reveals the browser chrome underneath. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping,
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+/* GSAP owns entrances: hide [data-enter] until useGSAP reveals it (class set by an inline script before paint, so no-JS still shows everything) */
+.js [data-enter] {
+  visibility: hidden;
+}
+
+body {
+  background:
+    radial-gradient(70% 40% at 15% 0%, rgb(186 230 253 / 0.7), transparent 70%),
+    radial-gradient(60% 40% at 90% 10%, rgb(251 207 232 / 0.75), transparent 70%),
+    radial-gradient(80% 50% at 50% 105%, rgb(233 213 255 / 0.7), transparent 70%),
+    var(--background);
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #ff5fa8 0%, #ff3d9a 40%, #a855f7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.glass {
+  background: rgb(255 255 255 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.95);
+  box-shadow: 0 12px 32px -16px rgb(150 70 160 / 0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Indeterminate upload bar (proof screen) */
+@keyframes upload {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 300% 0;
+  }
+}
