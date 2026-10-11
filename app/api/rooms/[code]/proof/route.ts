@@ -11,9 +11,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/rooms/[code
     const { code } = await ctx.params
     const { secret, ext, kind } = await req.json()
     const room = await getRoom(code)
-    if (!room?.players.some((p) => p.id === playerId(secret))) throw new GameError("Tum is room mein nahi ho")
+    if (!room?.players.some((p) => p.id === playerId(secret))) throw new GameError("Tum is room mein nahi ho", "You're not in this room")
     const e = String(ext).toLowerCase()
-    if (!EXT.includes(e)) throw new GameError("Sirf photo ya voice note upload karo")
+    if (!EXT.includes(e)) throw new GameError("Sirf photo ya voice note upload karo", "Only photos or voice notes can be uploaded")
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
     const apiKey = process.env.CLOUDINARY_API_KEY
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/rooms/[code
 
     const path = `${code}/${crypto.randomUUID()}.${e}`
     const { data, error } = await admin().storage.from(BUCKET).createSignedUploadUrl(path)
-    if (error || !data) throw new Error(error?.message || "Upload link nahi bana, dobara try karo")
+    if (error || !data) throw new GameError("Upload link nahi bana, dobara try karo", "Couldn't prepare the upload, please try again")
     return Response.json({ provider: "supabase", path, token: data.token })
   } catch (e) {
     return errorResponse(e)

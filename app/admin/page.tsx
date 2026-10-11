@@ -19,7 +19,7 @@ const ago = (t: number, now: number) => {
   return s < 60 ? "abhi" : s < 3600 ? `${Math.floor(s / 60)}m pehle` : `${Math.floor(s / 3600)}h pehle`
 }
 
-const PHASE: Record<Room["phase"], string> = { lobby: "Lobby", dare: "Dare chal raha", result: "Round result", final: "Game khatam" }
+const PHASE: Record<Room["phase"], string> = { lobby: "Lobby", pick: "Dare chun rahe", dare: "Dare chal raha", result: "Round result", final: "Game khatam" }
 
 async function call(method: "GET" | "POST" | "DELETE", url = "/api/admin", body?: object) {
   const res = await fetch(url, {
@@ -262,7 +262,7 @@ function RoomCard({ room: { code, updatedAt, state }, now, onGone }: { room: Adm
         <ul className="mt-3 flex flex-col gap-2">
           {proofs.map((x) => {
             const p = state.players.find((pl) => pl.id === x.by)
-            const label = `${x.name} · Round ${x.round}`
+            const label = `${x.name} · Round ${x.round}${x.from ? ` · ${x.from} ka diya dare` : ""}`
             return (
               <li key={`${x.by}${x.at}`} className="rounded-2xl bg-white/70 p-3">
                 <div className="flex items-start gap-2.5">

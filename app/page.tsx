@@ -7,22 +7,24 @@ import { ChevronRight, Flame, LogIn } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Deco, Face, Gif, LEVEL_ICON, NameDialog, Screen, SoundToggle } from "@/components/game/kit"
+import { Deco, Face, Gif, LangToggle, LEVEL_ICON, NameDialog, Screen, SoundToggle } from "@/components/game/kit"
 import { Float, Pulse } from "@/components/game/fx"
 import { api, forgetRoom, lastRoom } from "@/lib/client"
+import { getLang, useT } from "@/lib/i18n"
 import { LEVELS, LEVEL_ORDER } from "@/lib/dares"
 import { ROUNDS, type Room } from "@/lib/game"
 
 // Figma 01 · Home
 export default function Home() {
   const router = useRouter()
+  const t = useT()
   const [asking, setAsking] = useState(false)
   const [busy, setBusy] = useState(false)
 
   async function create(name: string, avatar: "boy" | "girl") {
     setBusy(true)
     try {
-      const { room } = await api("/api/rooms", { name, avatar })
+      const { room } = await api("/api/rooms", { name, avatar, lang: getLang() })
       router.push(`/room/${room.code}`)
     } catch (e) {
       toast.error((e as Error).message)
@@ -38,18 +40,18 @@ export default function Home() {
           <Resume />
           <div data-enter>
             <Button variant="glow" size="cta" onClick={() => setAsking(true)}>
-              <Flame /> Create Room
+              <Flame /> {t("Room banao", "Create Room")}
             </Button>
           </div>
           <div data-enter className="mt-3">
             <Button asChild variant="glass" size="cta">
               <Link href="/join">
-                <LogIn /> Join Room
+                <LogIn /> {t("Room join karo", "Join Room")}
               </Link>
             </Button>
           </div>
           <p data-enter className="mt-4 text-center text-xs text-muted-foreground">
-            Couples ke liye • Safe, consensual &amp; fun
+            {t("Couples ke liye • Safe, consensual & fun", "For couples • Safe, consensual & fun")}
           </p>
         </>
       }
@@ -63,8 +65,9 @@ export default function Home() {
       <Deco type="flower" x={14} y={600} size={28} color="#c4b5fd" delay={0.3} />
       <Deco type="sparkle" x={330} y={590} size={20} delay={0.9} />
 
-      <div data-enter className="flex items-center justify-between">
+      <div data-enter className="flex items-center justify-between gap-2">
         <SoundToggle />
+        <LangToggle />
         <Badge variant="pink">18+</Badge>
       </div>
 
@@ -81,7 +84,10 @@ export default function Home() {
         Dare Battles
       </h1>
       <p data-enter className="mx-auto mt-2.5 max-w-[310px] text-center text-base leading-6 text-muted-foreground text-balance">
-        Partner ko voice notes aur photos ke dares do. Proof bhejo, points lo, champion bano.
+        {t(
+          "Ek dusre ke liye dares chuno — voice note ya photo se proof do, points lo, champion bano.",
+          "Pick dares for each other — prove it with a voice note or photo, score points, become the champion.",
+        )}
       </p>
       <ul data-enter className="mt-4 flex items-center justify-center gap-4 text-[13px] font-semibold text-foreground/75" aria-label="Levels">
         {LEVEL_ORDER.map((l) => {
@@ -97,13 +103,14 @@ export default function Home() {
 
       <div className="min-h-4 flex-1" />
 
-      <NameDialog open={asking} onOpenChange={setAsking} onSubmit={create} busy={busy} cta="Room banao" />
+      <NameDialog open={asking} onOpenChange={setAsking} onSubmit={create} busy={busy} cta={t("Room banao", "Create room")} />
     </Screen>
   )
 }
 
 /** Reopening the installed app lands here; if this phone is still in a live room, offer the way back in. */
 function Resume() {
+  const t = useT()
   const [live, setLive] = useState<{ room: Room; me: string } | null>(null)
 
   useEffect(() => {
@@ -119,26 +126,27 @@ function Resume() {
   const { room, me } = live
   const partner = room.players.find((p) => p.id !== me)
   const you = room.players.find((p) => p.id === me)!
+  const score = `${you.score}–${partner?.score ?? 0}`
   const line =
     room.phase === "lobby"
       ? partner
-        ? `Lobby · ${partner.name} ke saath`
-        : "Lobby · partner ka wait"
+        ? t(`Lobby · ${partner.name} ke saath`, `Lobby · with ${partner.name}`)
+        : t("Lobby · partner ka wait", "Lobby · waiting for partner")
       : room.phase === "final"
-        ? `Final score · ${you.score}–${partner?.score ?? 0}`
-        : `Round ${room.round}/${ROUNDS} · ${you.score}–${partner?.score ?? 0}`
+        ? `Final score · ${score}`
+        : `Round ${room.round}/${ROUNDS} · ${score}`
 
   return (
     <Link
       href={`/room/${room.code}`}
-      className="glass mb-3 flex items-center gap-3 rounded-3xl py-3 pr-3 pl-3.5 animate-in fade-in slide-in-from-bottom-3 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98] transition-transform"
+      className="glass mb-3 flex items-center gap-3 rounded-3xl py-3 pr-3 pl-3.5 transition-transform animate-in fade-in slide-in-from-bottom-3 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98]"
     >
       <div className="flex -space-x-3">
         <Face name={you.name} avatar={you.avatar} size={38} />
         {partner && <Face name={partner.name} avatar={partner.avatar} size={38} />}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-bold">Battle continue karo</p>
+        <p className="text-[15px] font-bold">{t("Battle continue karo", "Continue battle")}</p>
         <p className="truncate text-[13px] text-muted-foreground">{line}</p>
       </div>
       <span className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#dc1474,#9b3df0)] text-white">

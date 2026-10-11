@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Mic, Pause, Play, RotateCcw, Square } from "lucide-react"
 import { cue } from "@/lib/sfx"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export const MAX_VOICE = 60 // seconds
@@ -21,6 +22,7 @@ type Take = { blob: Blob; url: string; seconds: number }
 
 /** Tap to record, tap to stop. Hands the finished take (or null on re-record) to `onTake`. */
 export function VoiceRecorder({ onTake, disabled }: { onTake: (t: Take | null) => void; disabled?: boolean }) {
+  const t = useT()
   const [phase, setPhase] = useState<"idle" | "rec" | "done" | "denied">("idle")
   const [elapsed, setElapsed] = useState(0)
   const [take, setTake] = useState<Take | null>(null)
@@ -37,7 +39,7 @@ export function VoiceRecorder({ onTake, disabled }: { onTake: (t: Take | null) =
     } catch {
       return setPhase("denied")
     }
-    const mimeType = MIME.find((t) => MediaRecorder.isTypeSupported(t))
+    const mimeType = MIME.find((m) => MediaRecorder.isTypeSupported(m))
     const rec = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 64_000 } : undefined)
     const chunks: Blob[] = []
     const t0 = performance.now()
@@ -59,9 +61,9 @@ export function VoiceRecorder({ onTake, disabled }: { onTake: (t: Take | null) =
     rec.onstop = () => {
       const seconds = Math.min(MAX_VOICE, (performance.now() - t0) / 1000)
       const blob = new Blob(chunks, { type: rec.mimeType || mimeType || "audio/webm" })
-      const t = { blob, url: URL.createObjectURL(blob), seconds }
-      setTake(t)
-      onTake(t)
+      const next = { blob, url: URL.createObjectURL(blob), seconds }
+      setTake(next)
+      onTake(next)
       setPhase("done")
     }
 
@@ -106,7 +108,7 @@ export function VoiceRecorder({ onTake, disabled }: { onTake: (t: Take | null) =
           disabled={disabled}
           className="mx-auto flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-foreground/75 transition-colors hover:bg-white/70 disabled:opacity-50"
         >
-          <RotateCcw className="size-4" /> Dobara record karo
+          <RotateCcw className="size-4" /> {t("Dobara record karo", "Record again")}
         </button>
       </div>
     )
@@ -120,7 +122,7 @@ export function VoiceRecorder({ onTake, disabled }: { onTake: (t: Take | null) =
           type="button"
           onClick={rec ? stop : start}
           disabled={disabled}
-          aria-label={rec ? "Recording roko" : "Voice note record karo"}
+          aria-label={rec ? t("Recording roko", "Stop recording") : t("Voice note record karo", "Record a voice note")}
           className={cn(
             "relative grid size-20 place-items-center rounded-full text-white transition-[transform,background-color,box-shadow] duration-200 ease-out active:scale-90 disabled:opacity-50",
             rec
@@ -144,20 +146,20 @@ export function VoiceRecorder({ onTake, disabled }: { onTake: (t: Take | null) =
 
       {phase === "denied" ? (
         <p className="mt-3 text-[13px] leading-snug text-[#be123c]" role="alert">
-          Mic ki permission nahi mili. Browser settings mein microphone allow karo, phir dobara tap karo.
+          {t("Mic ki permission nahi mili. Browser settings mein microphone allow karo, phir dobara tap karo.", "No microphone access. Allow the mic in your browser settings, then tap again.")}
         </p>
       ) : (
         <p className="mt-3 text-sm font-semibold tabular-nums" aria-live="polite">
           {rec ? (
             <span className="text-[#be123c]">
-              Recording… {clock(elapsed)} / {clock(MAX_VOICE)}
+              {t("Recording…", "Recording…")} {clock(elapsed)} / {clock(MAX_VOICE)}
             </span>
           ) : (
-            "Tap karke record karo"
+            t("Tap karke record karo", "Tap to record")
           )}
         </p>
       )}
-      <p className="mt-0.5 text-xs text-muted-foreground">{rec ? "Ho gaya? Stop dabao" : `Max ${MAX_VOICE} sec • partner ke liye`}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{rec ? t("Ho gaya? Stop dabao", "Done? Tap stop") : t(`Max ${MAX_VOICE} sec • partner ke liye`, `Max ${MAX_VOICE} sec • for your partner`)}</p>
     </div>
   )
 }
@@ -175,6 +177,7 @@ function wave(src: string, n: number) {
 
 /** Play/pause + tap-to-seek waveform. `seconds` covers WebM notes whose header has no duration. */
 export function VoicePlayer({ src, seconds, compact }: { src: string; seconds?: number; compact?: boolean }) {
+  const t = useT()
   const audio = useRef<HTMLAudioElement>(null)
   const played = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(false)
@@ -235,7 +238,7 @@ export function VoicePlayer({ src, seconds, compact }: { src: string; seconds?: 
       <button
         type="button"
         onClick={toggle}
-        aria-label={playing ? "Pause" : "Voice note suno"}
+        aria-label={playing ? "Pause" : t("Voice note suno", "Play voice note")}
         className={cn(
           "grid shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#dc1474,#9b3df0)] text-white shadow-[0_8px_18px_-8px_rgb(220_20_116/0.8)] transition-transform active:scale-90",
           compact ? "size-9" : "size-12",

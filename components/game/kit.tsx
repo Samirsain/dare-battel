@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Float, TypingDots, useEnter } from "./fx"
 import { rememberAvatar, rememberName, savedAvatar, savedName } from "@/lib/client"
 import { setMuted, useMuted } from "@/lib/sfx"
+import { setLang, useLang, useT } from "@/lib/i18n"
 import type { Avatar as AvatarKind, Level } from "@/lib/game"
 import { cn } from "@/lib/utils"
 
@@ -109,12 +110,13 @@ export function Header({ title, back = "/", right }: { title: string; back?: str
 /** Sound on/off; haptics stay on (the phone's own vibration setting governs those). */
 export function SoundToggle({ className }: { className?: string }) {
   const muted = useMuted()
+  const t = useT()
   return (
     <button
       type="button"
       onClick={() => setMuted(!muted)}
       aria-pressed={!muted}
-      aria-label={muted ? "Sound on karo" : "Sound off karo"}
+      aria-label={muted ? t("Sound on karo", "Turn sound on") : t("Sound off karo", "Turn sound off")}
       className={cn(
         "glass grid size-10 shrink-0 place-items-center rounded-full text-foreground/80 transition-transform duration-150 active:scale-90",
         className,
@@ -122,6 +124,37 @@ export function SoundToggle({ className }: { className?: string }) {
     >
       {muted ? <VolumeX className="size-[18px]" /> : <Volume2 className="size-[18px]" />}
     </button>
+  )
+}
+
+/** Hinglish / English switch; the whole app (dares, alerts, errors) follows it. */
+export function LangToggle() {
+  const lang = useLang()
+  return (
+    <div role="radiogroup" aria-label="Language" className="glass relative grid h-10 grid-cols-2 rounded-full p-1 text-[13px] font-semibold">
+      <span
+        aria-hidden
+        className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-[linear-gradient(135deg,#dc1474,#9b3df0)] shadow-[0_6px_14px_-6px_rgb(220_20_116/0.8)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{ transform: lang === "en" ? "translateX(100%)" : undefined }}
+      />
+      {(
+        [
+          ["hi", "Hinglish"],
+          ["en", "English"],
+        ] as const
+      ).map(([l, label]) => (
+        <button
+          key={l}
+          type="button"
+          role="radio"
+          aria-checked={lang === l}
+          onClick={() => setLang(l)}
+          className={cn("relative z-10 rounded-full px-3 transition-colors duration-200", lang === l ? "text-white" : "text-foreground/70")}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -249,7 +282,8 @@ export function Face({ name, avatar = "boy", size = 28, className }: { name: str
   )
 }
 
-export function LoadingScreen({ message = "Load ho raha hai…" }: { message?: string }) {
+export function LoadingScreen({ message }: { message?: string }) {
+  const t = useT()
   return (
     <Screen glows={[[-90, 90, 280, "purple"], [170, 560, 300, "pink"]]} className="items-center justify-center gap-6 text-center">
       <Float amp={10} className="pointer-events-none">
@@ -258,7 +292,7 @@ export function LoadingScreen({ message = "Load ho raha hai…" }: { message?: s
       <div data-enter>
         <p className="text-gradient text-3xl font-extrabold">Dare Battles</p>
         <p className="mt-1 text-sm text-muted-foreground" role="status" aria-live="polite">
-          {message}
+          {message ?? t("Load ho raha hai…", "Loading…")}
         </p>
       </div>
       <TypingDots />
@@ -280,13 +314,14 @@ export function NameDialog({
   busy?: boolean
   cta: string
 }) {
+  const t = useT()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent sheet className="glass gap-5 bg-white/95 px-6 pt-6">
         <DialogHeader className="items-center text-center">
           <Gif name="eyes" size={72} />
-          <DialogTitle className="text-xl font-bold">Tumhara profile</DialogTitle>
-          <DialogDescription>He ya She chuno, phir apna naam likho</DialogDescription>
+          <DialogTitle className="text-xl font-bold">{t("Tumhara profile", "Your profile")}</DialogTitle>
+          <DialogDescription>{t("He ya She chuno, phir apna naam likho", "Pick He or She, then type your name")}</DialogDescription>
         </DialogHeader>
         {open && <NameForm onSubmit={onSubmit} busy={busy} cta={cta} />}
       </DialogContent>
@@ -297,6 +332,7 @@ export function NameDialog({
 function NameForm({ onSubmit, busy, cta }: { onSubmit: (name: string, avatar: AvatarKind) => void; busy?: boolean; cta: string }) {
   const [name, setName] = useState(savedName)
   const [avatar, setAvatar] = useState<AvatarKind>(savedAvatar)
+  const t = useT()
 
   return (
     <form
@@ -316,7 +352,7 @@ function NameForm({ onSubmit, busy, cta }: { onSubmit: (name: string, avatar: Av
         value={name}
         onChange={(e) => setName(e.target.value)}
         maxLength={20}
-        placeholder="Tumhara naam, e.g. Aarav / Meera"
+        placeholder={t("Tumhara naam, e.g. Aarav / Meera", "Your name, e.g. Aarav / Meera")}
         aria-label="Your name"
         autoComplete="given-name"
         enterKeyHint="go"

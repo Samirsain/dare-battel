@@ -33,6 +33,7 @@ export const savedName = () => load("db:name") ?? ""
 export const rememberName = (n: string) => save("db:name", n)
 export const savedAvatar = (): "boy" | "girl" => (load("db:avatar") as "boy" | "girl") || "boy"
 export const rememberAvatar = (a: "boy" | "girl") => save("db:avatar", a)
+const english = () => load("db:lang") === "en" // same key as lib/i18n; read directly to avoid an import cycle
 
 /** The room this device last played in, so reopening the installed app can resume it. */
 export const lastRoom = () => load("db:room")
@@ -65,7 +66,7 @@ export async function api<T = RoomRes>(path: string, body?: object): Promise<T> 
   )
   const json = await res.json().catch(() => ({}))
   if (typeof json.now === "number") skew = json.now - Date.now()
-  if (!res.ok) throw new Error(json.error ?? "Network issue, dobara try karo")
+  if (!res.ok) throw new Error((english() && json.en) || json.error || (english() ? "Network issue, please try again" : "Network issue, dobara try karo"))
   return json
 }
 
@@ -126,7 +127,7 @@ export async function pushState() {
 }
 
 export async function enablePush() {
-  if ((await Notification.requestPermission()) !== "granted") throw new Error("Notifications allow nahi hui")
+  if ((await Notification.requestPermission()) !== "granted") throw new Error(english() ? "Notifications weren't allowed" : "Notifications allow nahi hui")
   const reg = await navigator.serviceWorker.ready
   const key = Uint8Array.from(atob(VAPID!.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0))
   const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }))
@@ -140,13 +141,18 @@ export async function disablePush() {
 }
 
 export const inviteText = (code: string) =>
-  `Dare Battle khelega? Mera room code: *${code}*\nJoin karo: ${location.origin}/join?code=${code}`
+  english()
+    ? `Play Dare Battles with me? Room code: *${code}*\nJoin: ${location.origin}/join?code=${code}`
+    : `Dare Battle khelega? Mera room code: *${code}*\nJoin karo: ${location.origin}/join?code=${code}`
 
 export const openWhatsApp = (text: string) => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank")
 
 /** Share the generated result card as an image where the OS share sheet supports files, else WhatsApp text. */
 export async function shareResult(q: { a: string; as: number; b: string; bs: number; r: number }) {
-  const text = `${q.as >= q.bs ? q.a : q.b} bana Dare Champion (${q.as}–${q.bs})\nTum bhi khelo: ${location.origin}`
+  const champ = q.as >= q.bs ? q.a : q.b
+  const text = english()
+    ? `${champ} is the Dare Champion (${q.as}–${q.bs})\nPlay too: ${location.origin}`
+    : `${champ} bana Dare Champion (${q.as}–${q.bs})\nTum bhi khelo: ${location.origin}`
   try {
     const params = new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]))
     const blob = await (await fetch(`/api/card?${params}`)).blob()

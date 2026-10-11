@@ -4,7 +4,7 @@ import { GameError } from "@/lib/game"
 // Saves (or with sub: null, removes) this device's push subscription, keyed by the player's hashed secret.
 export async function POST(req: Request) {
   try {
-    if (!pushReady) throw new GameError("Notifications abhi setup nahi hain")
+    if (!pushReady) throw new GameError("Notifications abhi setup nahi hain", "Notifications aren't set up yet")
     const { secret, sub } = await req.json()
     const player = playerId(secret)
     const db = admin()
@@ -13,12 +13,12 @@ export async function POST(req: Request) {
       return Response.json({ ok: true })
     }
     if (typeof sub?.endpoint !== "string" || !sub.endpoint.startsWith("https://") || !sub.keys?.p256dh || !sub.keys?.auth) {
-      throw new GameError("Notification subscription galat hai")
+      throw new GameError("Notification subscription galat hai", "Invalid notification subscription")
     }
     const { error } = await db
       .from("push_subs")
       .upsert({ player, sub: { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } }, updated_at: new Date().toISOString() })
-    if (error) throw new Error("Notifications save nahi hui, dobara try karo")
+    if (error) throw new GameError("Notifications save nahi hui, dobara try karo", "Couldn't save notifications, please try again")
     return Response.json({ ok: true })
   } catch (e) {
     return errorResponse(e)

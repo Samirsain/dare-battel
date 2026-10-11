@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 import { after } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import webpush from "web-push"
-import { createRoom, expired, notice, redact, reduce, GameError, type Action, type Notice, type Room } from "./game.ts"
+import { createRoom, expired, notice, redact, reduce, GameError, type Action, type Lang, type Notice, type Room } from "./game.ts"
 
 export { redact }
 
@@ -17,7 +17,7 @@ export const BUCKET = "proofs"
 // Clients hold a random secret; state only ever exposes its hash, so seeing the room
 // over realtime doesn't let anyone act as the other player.
 export const playerId = (secret: unknown) => {
-  if (typeof secret !== "string" || secret.length < 16) throw new GameError("Session missing, page refresh karo")
+  if (typeof secret !== "string" || secret.length < 16) throw new GameError("Session missing, page refresh karo", "Session missing, please refresh the page")
   return createHash("sha256").update(secret).digest("hex").slice(0, 16)
 }
 
@@ -55,15 +55,15 @@ export async function getRoom(code: string): Promise<Room | null> {
   return data.state as Room
 }
 
-export async function newRoom(secret: unknown, name: unknown, avatar?: "boy" | "girl"): Promise<Room> {
+export async function newRoom(secret: unknown, name: unknown, avatar?: "boy" | "girl", lang?: Lang): Promise<Room> {
   const id = playerId(secret)
   for (let i = 0; i < 5; i++) {
     const code = String(Math.floor(100000 + Math.random() * 900000))
-    const room = createRoom(code, id, name as string, Date.now(), avatar)
+    const room = createRoom(code, id, name as string, Date.now(), avatar, lang)
     const { error } = await admin().from("rooms").insert({ code, state: room, v: room.v }) // pk clash -> roll again
     if (!error) return room
   }
-  throw new Error("Room nahi ban paya, dobara try karo")
+  throw new GameError("Room nahi ban paya, dobara try karo", "Couldn't create the room, please try again")
 }
 
 /** Optimistic concurrency: read v, reduce, write only if v unchanged; retry on a race. */
@@ -72,7 +72,7 @@ export async function act(code: string, secret: unknown, action: Action): Promis
   const db = admin()
   for (let i = 0; i < 4; i++) {
     const room = await getRoom(code)
-    if (!room) throw new GameError("Room nahi mila ya expire ho gaya")
+    if (!room) throw new GameError("Room nahi mila ya expire ho gaya", "Room not found or expired")
     const next = reduce(room, by, action, Date.now())
     if (next === room) return room
     const { data } = await db
@@ -90,7 +90,7 @@ export async function act(code: string, secret: unknown, action: Action): Promis
       return next
     }
   }
-  throw new Error("Bahut tez! Ek baar aur try karo")
+  throw new GameError("Bahut tez! Ek baar aur try karo", "Too fast! Try once more")
 }
 
 /** Deletes a room and every proof it stored (Supabase bucket + Cloudinary folder). Returns how many bucket files went. */
@@ -130,7 +130,9 @@ export function isAdmin(token: string | undefined) {
   return Number(exp) > Date.now() && same(sig, sign(Number(exp)))
 }
 
+/** `error` is Hinglish, `en` English; the client picks by the player's language. Unexpected errors stay generic. */
 export function errorResponse(e: unknown) {
-  const msg = e instanceof Error ? e.message : "Kuch gadbad ho gayi"
-  return Response.json({ error: msg }, { status: e instanceof GameError ? 400 : 500 })
+  if (e instanceof GameError) return Response.json({ error: e.message, en: e.en }, { status: 400 })
+  console.error(e)
+  return Response.json({ error: "Kuch gadbad ho gayi, dobara try karo", en: "Something went wrong, please try again" }, { status: 500 })
 }

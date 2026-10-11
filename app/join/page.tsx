@@ -10,6 +10,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Gif, Header, LoadingScreen, NameDialog, Screen } from "@/components/game/kit"
 import { Float } from "@/components/game/fx"
 import { api } from "@/lib/client"
+import { getLang, useT } from "@/lib/i18n"
 
 // Figma 03 · Join Room
 export default function JoinPage() {
@@ -23,6 +24,7 @@ export default function JoinPage() {
 function Join() {
   const router = useRouter()
   const params = useSearchParams()
+  const t = useT()
   const [code, setCode] = useState(() => (params.get("code") ?? "").replace(/\D/g, "").slice(0, 6))
   const [asking, setAsking] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -31,7 +33,7 @@ function Join() {
   async function join(name: string, avatar: "boy" | "girl") {
     setBusy(true)
     try {
-      await api(`/api/rooms/${code}`, { action: { type: "join", name, avatar } })
+      await api(`/api/rooms/${code}`, { action: { type: "join", name, avatar, lang: getLang() } })
       router.push(`/room/${code}`)
     } catch (e) {
       toast.error((e as Error).message)
@@ -47,22 +49,22 @@ function Join() {
         <>
           <div data-enter>
             <Button variant="glow" size="cta" disabled={!ready} onClick={() => setAsking(true)}>
-              <Swords /> Join Battle
+              <Swords /> {t("Battle join karo", "Join Battle")}
             </Button>
           </div>
           <p data-enter className="mt-2.5 text-center text-[13px] text-muted-foreground" aria-live="polite">
-            {ready ? "Ready! Join karo" : "6 digit ka code daalo"}
+            {ready ? t("Ready! Join karo", "Ready! Tap to join") : t("6 digit ka code daalo", "Enter the 6-digit code")}
           </p>
         </>
       }
     >
-      <Header title="Join Room" />
+      <Header title={t("Room join karo", "Join Room")} />
 
       <h2 data-enter className="mt-8 text-center text-[28px] leading-[34px] font-bold">
-        Enter room code
+        {t("Room code daalo", "Enter room code")}
       </h2>
       <p data-enter className="mt-2 text-center text-sm text-muted-foreground">
-        Apne partner se 6-digit code maango
+        {t("Apne partner se 6-digit code maango", "Ask your partner for the 6-digit code")}
       </p>
 
       <div data-enter className="mt-8">
@@ -90,7 +92,7 @@ function Join() {
         </InputOTP>
       </div>
       <p data-enter className="mx-auto mt-3.5 max-w-[300px] text-center text-[13px] leading-[17px] text-muted-foreground">
-        Code WhatsApp pe aaya hai? Long-press karke paste karo
+        {t("Code WhatsApp pe aaya hai? Long-press karke paste karo", "Got the code on WhatsApp? Long-press to paste it")}
       </p>
 
       <div className="flex min-h-28 flex-1 items-end justify-center">
@@ -99,7 +101,7 @@ function Join() {
         </Float>
       </div>
 
-      <NameDialog open={asking} onOpenChange={setAsking} onSubmit={join} busy={busy} cta="Battle join karo" />
+      <NameDialog open={asking} onOpenChange={setAsking} onSubmit={join} busy={busy} cta={t("Battle join karo", "Join the battle")} />
     </Screen>
   )
 }

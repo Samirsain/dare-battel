@@ -6,7 +6,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/rooms/[code]
   try {
     const { code } = await ctx.params
     const room = await getRoom(code)
-    if (!room) return Response.json({ error: "Room nahi mila ya expire ho gaya" }, { status: 404 })
+    if (!room) return Response.json({ error: "Room nahi mila ya expire ho gaya", en: "Room not found or expired" }, { status: 404 })
     const secret = req.headers.get("x-player")
     const me = secret ? playerId(secret) : null
     const player = room.players.some((p) => p.id === me)
@@ -45,5 +45,5 @@ async function signProof(code: string, p: unknown): Promise<Proof> {
     if (!error && data) return { url: data.signedUrl, kind: safeKind, caption: safeCaption }
   }
 
-  throw new GameError("Proof upload fail hua")
+  throw new GameError("Proof upload fail hua", "Proof upload failed")
 }
