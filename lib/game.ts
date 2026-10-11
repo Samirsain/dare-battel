@@ -1,6 +1,6 @@
-import { DARES, LEVELS, dareInfo, type Avatar, type Level } from "./dares.ts"
+import { DARES, LEVELS, SECONDS, dareInfo, type Avatar, type Level, type ProofKind } from "./dares.ts"
 
-export type { Avatar, Level }
+export type { Avatar, Level, ProofKind }
 export const ROUNDS = 5
 export const MAX_SKIPS = 2
 export const JOIN_WINDOW = 10 * 60_000 // "Code expires in 10:00"
@@ -10,7 +10,17 @@ export const GRACE = 5_000 // network slack: a voice note may still be uploading
 
 export type ProofInput = { path?: string; url?: string; kind: Proof["kind"]; caption: string }
 export type Proof = { url: string; kind: "image" | "video" | "audio"; caption: string }
-export type Turn = { dare: number; endsAt: number; status: "pending" | "done" | "skipped" | "timeout"; proof: Proof | null }
+/** A dare one player wrote for the other in the lobby; dealt to the partner before the deck. */
+export type CustomDare = { id: string; by: string; text: string; proof: ProofKind }
+export type Turn = {
+  dare: number // index into DARES, or -1 for a custom dare
+  custom?: Omit<CustomDare, "id">
+  endsAt: number
+  status: "pending" | "done" | "skipped" | "timeout"
+  proof: Proof | null
+}
+/** Every proof sent in this room, for the admin panel (the turn only holds the current round's). */
+export type ProofLog = Proof & { round: number; by: string; name: string; dare: string; at: number }
 export type Player = { id: string; name: string; avatar?: Avatar; score: number; done: number; skipped: number; turn: Turn | null }
 export type Phase = "lobby" | "dare" | "result" | "final"
 export type FeedItem = { text: string; at: number; by?: string; banter?: boolean }
@@ -25,11 +35,15 @@ export type Room = {
   players: Player[]
   used: number[]
   feed: FeedItem[]
+  custom?: CustomDare[] // not yet dealt
+  proofs?: ProofLog[]
 }
 export type Action =
   | { type: "join"; name: string; avatar?: Avatar }
   | { type: "set_avatar"; avatar: Avatar }
   | { type: "set_level"; level: Level }
+  | { type: "add_dare"; text: string; proof: ProofKind }
+  | { type: "remove_dare"; id: string }
   | { type: "start" }
   | { type: "complete"; proof?: Proof }
   | { type: "skip" }
@@ -50,8 +64,37 @@ const newPlayer = (id: string, name: string, avatar: Avatar = "boy"): Player => 
 
 export const levelOf = (r: Room): Level => r.level ?? "friendly"
 
-/** The dare as `p` reads it: verbs agree with p's avatar and their partner's. */
-export const dareFor = (r: Room, p: Player) => dareInfo(p.turn!.dare, p.avatar, r.players.find((o) => o.id !== p.id)?.avatar)
+export const MAX_CUSTOM = 5
+
+/** The dare as `p` reads it: verbs agree with p's avatar and their partner's; custom dares score at the room's level. */
+export const dareFor = (r: Room, p: Player) => {
+  const t = p.turn!
+  if (t.custom) {
+    const level = levelOf(r)
+    return { ...LEVELS[level], level, proof: t.custom.proof, title: "Custom dare", text: t.custom.text, seconds: SECONDS[t.custom.proof], custom: true }
+  }
+  return { ...dareInfo(t.dare, p.avatar, r.players.find((o) => o.id !== p.id)?.avatar), custom: false }
+}
+
+/**
+ * What may travel over the public realtime channel (anyone who guesses a room code can listen):
+ * no proof links, no custom dare text, no proof history. `redacted` tells players to fetch the real state.
+ */
+export function redact(room: Room): Room & { redacted?: true } {
+  const hidden = room.custom?.length || room.proofs?.length || room.players.some((p) => p.turn?.proof || p.turn?.custom)
+  if (!hidden) return room
+  return {
+    ...room,
+    redacted: true,
+    custom: room.custom?.map((c) => ({ ...c, text: "" })),
+    proofs: [],
+    players: room.players.map((p) =>
+      p.turn
+        ? { ...p, turn: { ...p.turn, proof: p.turn.proof && { ...p.turn.proof, url: "" }, custom: p.turn.custom && { ...p.turn.custom, text: "" } } }
+        : p,
+    ),
+  }
+}
 
 export function createRoom(code: string, hostId: string, name: string, now: number, avatar: Avatar = "boy"): Room {
   return { code, v: 1, createdAt: now, hostId, phase: "lobby", round: 0, level: "friendly", players: [newPlayer(hostId, cleanName(name), avatar)], used: [], feed: [] }
@@ -70,6 +113,13 @@ function deal(r: Room, now: number, rand: () => number) {
     left = all
   }
   for (const p of r.players) {
+    // The partner's own dares come first, in the order they wrote them.
+    const mine = r.custom?.findIndex((c) => c.by !== p.id) ?? -1
+    if (mine >= 0) {
+      const [{ by, text, proof }] = r.custom!.splice(mine, 1)
+      p.turn = { dare: -1, custom: { by, text, proof }, endsAt: now + REVEAL + SECONDS[proof] * 1000, status: "pending", proof: null }
+      continue
+    }
     const dare = left.splice(Math.floor(rand() * left.length), 1)[0]
     r.used.push(dare)
     p.turn = { dare, endsAt: now + REVEAL + dareInfo(dare).seconds * 1000, status: "pending", proof: null }
@@ -120,6 +170,22 @@ export function reduce(room: Room, by: string, a: Action, now: number, rand: () 
       if (r.phase !== "lobby" || !(a.level in LEVELS) || r.level === a.level) return room
       r.level = a.level
       break
+    case "add_dare": {
+      if (r.phase !== "lobby") fail("Custom dares sirf lobby mein likh sakte ho")
+      const text = typeof a.text === "string" ? a.text.trim().replace(/\s+/g, " ").slice(0, 160) : ""
+      if (text.length < 5) fail("Dare thoda detail mein likho")
+      if (a.proof !== "voice" && a.proof !== "photo") fail("Proof type chuno")
+      r.custom ??= []
+      if (r.custom.filter((c) => c.by === by).length >= MAX_CUSTOM) fail(`Max ${MAX_CUSTOM} custom dares`)
+      r.custom.push({ id: `${now.toString(36)}${r.custom.length}`, by, text, proof: a.proof })
+      break
+    }
+    case "remove_dare": {
+      const before = r.custom?.length ?? 0
+      r.custom = r.custom?.filter((c) => !(c.id === a.id && c.by === by))
+      if ((r.custom?.length ?? 0) === before) return room
+      break
+    }
     case "start":
       if (by !== r.hostId) fail("Sirf host battle start kar sakta hai")
       if (r.phase !== "lobby") return room
@@ -132,7 +198,7 @@ export function reduce(room: Room, by: string, a: Action, now: number, rand: () 
     case "skip": {
       const t = me!.turn ?? fail("Abhi koi dare nahi hai")
       if (r.phase !== "dare" || t.status !== "pending") fail(t.status === "timeout" ? "Time khatam ho gaya" : "Ye dare already ho gaya")
-      const { title, points } = dareInfo(t.dare)
+      const { title, points, text } = dareFor(r, me!)
       if (a.type === "skip") {
         if (me!.skipped >= MAX_SKIPS) fail("Skip limit khatam! Ab toh dare karna padega")
         t.status = "skipped"
@@ -140,6 +206,7 @@ export function reduce(room: Room, by: string, a: Action, now: number, rand: () 
         log(r, `${me!.name} ne "${title}" skip kiya`, now, { by })
       } else {
         t.proof = a.proof ?? fail("Pehle proof bhejo — voice note ya photo")
+        r.proofs = [...(r.proofs ?? []), { ...t.proof, round: r.round, by, name: me!.name, dare: text, at: now }]
         t.status = "done"
         me!.done++
         me!.score += points

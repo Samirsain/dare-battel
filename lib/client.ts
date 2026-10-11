@@ -85,14 +85,11 @@ export function useRoom(code: string) {
   )
 
   useEffect(() => {
+    void refresh() // show the room now; the realtime socket can take 1–3s on mobile data
     const ch = supabase()
       .channel(`room:${code}`)
-      .on("broadcast", { event: "state" }, ({ payload }) => {
-        const room = payload as Room
-        // Broadcasts carry proofs without links (the channel is public); fetch the real ones with our secret.
-        if (room.players.some((p) => p.turn?.proof && !p.turn.proof.url)) refresh()
-        else accept(room)
-      })
+      // The channel is public, so private bits (proof links, custom dares) arrive blanked; fetch them with our secret.
+      .on("broadcast", { event: "state" }, ({ payload }) => (payload.redacted ? refresh() : accept(payload as Room)))
       .subscribe((status) => status === "SUBSCRIBED" && refresh())
     const onFocus = () => document.visibilityState === "visible" && refresh()
     document.addEventListener("visibilitychange", onFocus)

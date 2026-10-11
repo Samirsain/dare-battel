@@ -1,8 +1,10 @@
-import { createHash } from "node:crypto"
+import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 import { after } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import webpush from "web-push"
-import { createRoom, expired, notice, reduce, GameError, type Action, type Notice, type Room } from "./game.ts"
+import { createRoom, expired, notice, redact, reduce, GameError, type Action, type Notice, type Room } from "./game.ts"
+
+export { redact }
 
 // Server-only: the secret key never leaves route handlers (no NEXT_PUBLIC_ prefix).
 export const admin = () =>
@@ -20,12 +22,6 @@ export const playerId = (secret: unknown) => {
 }
 
 export const isCode = (code: string) => /^\d{6}$/.test(code)
-
-/** Proof links stay out of anything an outsider could see; players fetch them with their secret. */
-export const redact = (room: Room): Room => ({
-  ...room,
-  players: room.players.map((p) => (p.turn?.proof ? { ...p, turn: { ...p.turn, proof: { ...p.turn.proof, url: "" } } } : p)),
-})
 
 async function broadcast(room: Room) {
   // Anyone who guesses a room code can listen on this public channel, so it only ever carries redacted state.
@@ -86,12 +82,52 @@ export async function act(code: string, secret: unknown, action: Action): Promis
       .eq("v", room.v)
       .select("code")
     if (data?.length) {
-      await broadcast(next)
-      after(() => nudge(notice(room, next, by)))
+      // The mover already gets `next` in the response; the partner's copy and push go out right after it.
+      after(async () => {
+        await broadcast(next)
+        await nudge(notice(room, next, by))
+      })
       return next
     }
   }
   throw new Error("Bahut tez! Ek baar aur try karo")
+}
+
+/** Deletes a room and every proof it stored (Supabase bucket + Cloudinary folder). Returns how many bucket files went. */
+export async function purge(code: string) {
+  const db = admin()
+  await db.from("rooms").delete().eq("code", code)
+  const { data } = await db.storage.from(BUCKET).list(code)
+  if (data?.length) await db.storage.from(BUCKET).remove(data.map((f) => `${code}/${f.name}`))
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  const { CLOUDINARY_API_KEY: key, CLOUDINARY_API_SECRET: secret } = process.env
+  if (cloudName && key && secret) {
+    const headers = { Authorization: `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}` }
+    const api = `https://api.cloudinary.com/v1_1/${cloudName}`
+    for (const type of ["image", "video"]) {
+      await fetch(`${api}/resources/${type}/upload?prefix=dare-battles/${code}/`, { method: "DELETE", headers }).catch(() => {})
+    }
+    await fetch(`${api}/folders/dare-battles/${code}`, { method: "DELETE", headers }).catch(() => {})
+  }
+  return data?.length ?? 0
+}
+
+// Admin: one password from env (≥12 chars, else the panel stays off), traded for a signed 12h cookie.
+// ponytail: no login rate limit; a long random ADMIN_PASSWORD is the defence. Add a limiter if the URL leaks.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? ""
+export const adminEnabled = ADMIN_PASSWORD.length >= 12
+export const ADMIN_COOKIE = "db_admin"
+const sign = (exp: number) => createHmac("sha256", ADMIN_PASSWORD).update(`admin:${exp}`).digest("hex")
+const same = (a: string, b: string) =>
+  timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest())
+
+export const checkAdminPassword = (p: unknown) => adminEnabled && typeof p === "string" && same(p, ADMIN_PASSWORD)
+export const adminToken = (exp: number) => `${exp}.${sign(exp)}`
+export function isAdmin(token: string | undefined) {
+  if (!adminEnabled || !token) return false
+  const [exp, sig = ""] = token.split(".")
+  return Number(exp) > Date.now() && same(sig, sign(Number(exp)))
 }
 
 export function errorResponse(e: unknown) {

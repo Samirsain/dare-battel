@@ -167,7 +167,7 @@ function ProofCard({ p, you }: { p: Player; you?: boolean }) {
   )
 }
 
-function MediaButton({ proof, title }: { proof: Proof; title: string }) {
+export function MediaButton({ proof, title }: { proof: Proof; title: string }) {
   const [open, setOpen] = useState(false)
   return (
     <>

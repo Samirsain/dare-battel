@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import { useGSAP } from "@gsap/react"
-import { Camera, ImagePlus, Loader2, MessageSquareHeart, Mic, Send, SkipForward, Sparkles } from "lucide-react"
+import { Camera, ImagePlus, Loader2, MessageSquareHeart, Mic, PenLine, Send, SkipForward, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -80,7 +80,7 @@ function Dare({ room, you, partner, act, now, left, onProof, onSkip }: Props & {
   const turn = you.turn!
   const info = dareFor(room, you)
   const skipsLeft = MAX_SKIPS - you.skipped
-  const LevelIcon = LEVEL_ICON[info.level]
+  const LevelIcon = info.custom ? PenLine : LEVEL_ICON[info.level]
   const voice = info.proof === "voice"
 
   useGSAP(
@@ -163,8 +163,8 @@ function Dare({ room, you, partner, act, now, left, onProof, onSkip }: Props & {
       {/* Dare card */}
       <div ref={card} className="glass relative rounded-3xl p-4 opacity-0 sm:p-5">
         <div className="flex items-center gap-2">
-          <Badge variant={info.tone} className="gap-1 px-2.5 text-xs">
-            <LevelIcon /> {info.label}
+          <Badge variant={info.custom ? "gold" : info.tone} className="gap-1 px-2.5 text-xs">
+            <LevelIcon /> {info.custom ? "Custom" : info.label}
           </Badge>
           <Badge variant="secondary" className="h-[27px] gap-1 border-[#ead9f2] px-2.5 text-xs font-semibold text-foreground/80">
             {voice ? <Mic /> : <Camera />} {voice ? "Voice note" : "Photo"}
@@ -178,7 +178,7 @@ function Dare({ room, you, partner, act, now, left, onProof, onSkip }: Props & {
 
         <div className="mt-3 flex items-center gap-2 pr-12">
           <Face name={partner.name} avatar={partner.avatar} size={22} />
-          <span className="truncate text-xs text-muted-foreground">{partner.name} ka dare</span>
+          <span className="truncate text-xs text-muted-foreground">{info.custom ? `${partner.name} ne khud likha ✍️` : `${partner.name} ka dare`}</span>
         </div>
 
         <div className="pointer-events-none absolute -right-2 -bottom-3">
@@ -402,8 +402,8 @@ function UploadProof({ room, you, act, left, onBack, onSent }: Props & { left: n
         />
 
         <div data-enter className="glass rounded-2xl px-4 py-3">
-          <Badge variant={info.tone} className="h-6 text-[11px]">
-            {info.label} · +{info.points}
+          <Badge variant={info.custom ? "gold" : info.tone} className="h-6 text-[11px]">
+            {info.custom ? "Custom" : info.label} · +{info.points}
           </Badge>
           <p className="mt-1.5 text-[15px] leading-snug font-semibold text-balance">{info.text}</p>
         </div>
@@ -434,7 +434,7 @@ function UploadProof({ room, you, act, left, onBack, onSent }: Props & { left: n
                     <Camera className="size-7 text-white" />
                   </span>
                   <span className="mt-3 text-[15px] font-semibold">Photo lo ya gallery se chuno</span>
-                  <span className="mt-1 max-w-[240px] text-xs leading-tight text-muted-foreground">Sirf partner dekhega • 24 ghante mein delete</span>
+                  <span className="mt-1 max-w-[240px] text-xs leading-tight text-muted-foreground">Partner ke liye • 24 ghante mein delete</span>
                 </>
               )}
             </label>

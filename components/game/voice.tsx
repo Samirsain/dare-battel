@@ -157,7 +157,7 @@ export function VoiceRecorder({ onTake, disabled }: { onTake: (t: Take | null) =
           )}
         </p>
       )}
-      <p className="mt-0.5 text-xs text-muted-foreground">{rec ? "Ho gaya? Stop dabao" : `Max ${MAX_VOICE} sec • sirf partner sunega`}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{rec ? "Ho gaya? Stop dabao" : `Max ${MAX_VOICE} sec • partner ke liye`}</p>
     </div>
   )
 }

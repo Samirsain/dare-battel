@@ -3,17 +3,18 @@
 import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import { useGSAP } from "@gsap/react"
-import { ArrowRight, Bell, BellOff, BellRing, Camera, Copy, HeartHandshake, Loader2, Mic, Repeat2, Share2, SkipForward, Sparkles, Swords, Timer } from "lucide-react"
+import { ArrowRight, Bell, BellOff, BellRing, Camera, ChevronRight, Copy, HeartHandshake, Loader2, Mic, PenLine, Plus, Repeat2, Share2, SkipForward, Sparkles, Swords, Timer, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { AVATARS, Deco, Face, Gif, Header, LEVEL_ICON, Screen, SoundToggle } from "./kit"
 import { calm, Float, Pulse, TypingDots } from "./fx"
 import { disablePush, enablePush, inviteText, openWhatsApp, pushState, useNow } from "@/lib/client"
 import { LEVELS, LEVEL_ORDER } from "@/lib/dares"
-import { JOIN_WINDOW, MAX_SKIPS, ROUNDS, levelOf, type Action, type Level, type Player, type Room } from "@/lib/game"
+import { JOIN_WINDOW, MAX_CUSTOM, MAX_SKIPS, ROUNDS, levelOf, type Action, type Level, type Player, type ProofKind, type Room } from "@/lib/game"
 import { cn } from "@/lib/utils"
 
 const mmss = (ms: number) => {
@@ -252,6 +253,10 @@ export function Lobby({ room, you, partner, run }: { room: Room; you: Player; pa
       </div>
 
       <div data-enter className="mt-3">
+        <CustomDares room={room} you={you} partner={partner} run={run} />
+      </div>
+
+      <div data-enter className="mt-3">
         {partner ? <NotifyToggle /> : (
           <Button variant="success" size="cta" className="h-12" onClick={() => openWhatsApp(inviteText(room.code))}>
             <Share2 /> Code WhatsApp karo
@@ -277,9 +282,10 @@ export function Lobby({ room, you, partner, run }: { room: Room; you: Player; pa
               [
                 [Timer, "Har round mein dono ko ek dare milega, timer ke saath"],
                 [Mic, "Proof hi dare hai: voice note record karo ya photo bhejo"],
+                [PenLine, `Custom dares: partner ke liye apne ${MAX_CUSTOM} tak dares likho — wo pehle milenge`],
                 [Sparkles, `Friendly +${LEVELS.friendly.points}, Couple +${LEVELS.couple.points}, Extreme +${LEVELS.extreme.points} points per dare`],
                 [SkipForward, `Poore game mein max ${MAX_SKIPS} skips — ya timer khatam hone do, koi pressure nahi`],
-                [Camera, "Proof sirf partner dekhega aur 24 ghante mein delete ho jayega"],
+                [Camera, "Proof partner ko jaata hai; safety ke liye admin bhi dekh sakta hai. 24 ghante mein auto-delete."],
                 [HeartHandshake, "Safe, consensual aur fun. Kuch uncomfortable lage toh bina soche skip karo."],
               ] as const
             ).map(([Icon, text]) => (
@@ -295,6 +301,122 @@ export function Lobby({ room, you, partner, run }: { room: Room; you: Player; pa
         </DialogContent>
       </Dialog>
     </Screen>
+  )
+}
+
+/** Each player writes dares for the other; the partner only sees how many, never the text, until it's dealt. */
+function CustomDares({ room, you, partner, run }: { room: Room; you: Player; partner?: Player; run: (a: Action) => Promise<unknown> }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState("")
+  const [proof, setProof] = useState<ProofKind>("voice")
+  const [busy, setBusy] = useState(false)
+  const mine = (room.custom ?? []).filter((c) => c.by === you.id)
+  const theirs = (room.custom ?? []).length - mine.length
+  const them = partner?.name ?? "Partner"
+  const full = mine.length >= MAX_CUSTOM
+
+  const add = async () => {
+    setBusy(true)
+    if (await run({ type: "add_dare", text, proof })) setText("")
+    setBusy(false)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="glass flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-transform duration-150 active:scale-[0.98]"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#fff1d6] text-[#a15c07]">
+          <PenLine className="size-[18px]" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Custom dares</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {mine.length ? `${mine.length} likhe ${them} ke liye` : `${them} ke liye apne dares likho`}
+            {theirs > 0 && ` · ${them} ne ${theirs} likhe 🤫`}
+          </span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-foreground/40" />
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent sheet className="glass gap-4 bg-white/95 px-6 pt-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Custom dares</DialogTitle>
+            <DialogDescription>
+              Ye {them} ko pehle milenge, deck se pehle. {them} ko sirf ginti dikhegi, dare nahi — surprise! 🤫
+            </DialogDescription>
+          </DialogHeader>
+
+          {mine.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {mine.map((c) => (
+                <li key={c.id} className="flex items-start gap-3 rounded-2xl bg-[#f6eefc]/80 py-2.5 pr-1.5 pl-3.5 animate-in fade-in slide-in-from-top-1 duration-300">
+                  {c.proof === "voice" ? <Mic className="mt-0.5 size-4 shrink-0 text-[#d61f74]" /> : <Camera className="mt-0.5 size-4 shrink-0 text-[#d61f74]" />}
+                  <span className="min-w-0 flex-1 text-sm leading-snug">{c.text}</span>
+                  <button
+                    type="button"
+                    aria-label="Dare hatao"
+                    onClick={() => run({ type: "remove_dare", id: c.id })}
+                    className="-my-1 grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 transition-colors hover:bg-white active:scale-90"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {full ? (
+            <p className="text-center text-sm text-muted-foreground">Max {MAX_CUSTOM} ho gaye. Ek hatao toh naya likh sakte ho.</p>
+          ) : (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (text.trim().length >= 5 && !busy) void add()
+              }}
+            >
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={160}
+                placeholder={`${them} ke liye dare likho… e.g. “Mere liye apni favourite song ki 2 lines gaao”`}
+                aria-label="Custom dare"
+                enterKeyHint="done"
+                className="min-h-24 resize-none rounded-2xl bg-white p-3.5 text-base"
+              />
+              <div role="radiogroup" aria-label="Proof type" className="grid grid-cols-2 gap-2">
+                {(["voice", "photo"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="radio"
+                    aria-checked={proof === k}
+                    onClick={() => setProof(k)}
+                    className={cn(
+                      "flex h-11 items-center justify-center gap-2 rounded-xl border-2 text-sm font-semibold transition-colors duration-200",
+                      proof === k ? "border-[#d61f74] bg-[#fff0f7] text-[#d61f74]" : "border-transparent bg-[#f6eefc] text-foreground/70",
+                    )}
+                  >
+                    {k === "voice" ? <Mic className="size-4" /> : <Camera className="size-4" />}
+                    {k === "voice" ? "Voice note" : "Photo"}
+                  </button>
+                ))}
+              </div>
+              <Button type="submit" variant="glow" size="cta" disabled={text.trim().length < 5 || busy}>
+                {busy ? <Loader2 className="animate-spin" /> : <Plus />} Dare add karo
+                <span className="font-normal opacity-80">
+                  ({mine.length}/{MAX_CUSTOM})
+                </span>
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

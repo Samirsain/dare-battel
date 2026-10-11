@@ -12,7 +12,7 @@ export const LEVELS: Record<Level, { label: string; tone: Tone; points: number; 
 export const LEVEL_ORDER: Level[] = ["friendly", "couple", "extreme"]
 
 /** Recording a voice note takes longer than snapping a photo. */
-const SECONDS: Record<ProofKind, number> = { voice: 90, photo: 75 }
+export const SECONDS: Record<ProofKind, number> = { voice: 90, photo: 75 }
 
 // [level, proof, short title for the live feed, full dare]. The partner "gives" each dare, so "mere/mujhe" = partner.
 // Gendered verbs: {he|she} agrees with the player doing the dare, [he|she] with the partner hearing it.

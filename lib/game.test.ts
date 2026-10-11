@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { createRoom, reduce, notice, GameError, ROUNDS, MAX_SKIPS, JOIN_WINDOW, type Room, type Proof } from "./game.ts"
+import { createRoom, reduce, notice, redact, dareFor, GameError, ROUNDS, MAX_SKIPS, MAX_CUSTOM, JOIN_WINDOW, type Room, type Proof } from "./game.ts"
 import { DARES, dareInfo } from "./dares.ts"
 
 const T0 = 1_000_000
@@ -110,4 +110,52 @@ test("notice: partner hears about joins, proofs and banter, not ticks", () => {
   const chat = reduce(done, "b", { type: "banter", text: "Jaldi!" }, T0 + 1)
   assert.deepEqual([notice(done, chat, "b")?.to, notice(done, chat, "b")?.body], ["a", "Jaldi!"])
   assert.equal(notice(r, reduce(r, "a", { type: "tick" }, T0 + 1000), "a"), null)
+})
+
+test("custom dares: written in lobby, dealt to the partner first, then the deck", () => {
+  let r = lobby()
+  assert.throws(() => reduce(r, "a", { type: "add_dare", text: "hi", proof: "voice" }, T0), /detail/)
+  r = reduce(r, "a", { type: "add_dare", text: "Mere liye  gaana gaao", proof: "voice" }, T0)
+  r = reduce(r, "a", { type: "add_dare", text: "Selfie bhejo smile ke saath", proof: "photo" }, T0 + 1)
+  assert.equal(r.custom!.length, 2)
+  assert.equal(r.custom![0].text, "Mere liye gaana gaao", "whitespace squashed")
+  const id = r.custom![1].id
+  assert.equal(reduce(r, "b", { type: "remove_dare", id }, T0), r, "only the author can remove")
+  for (let i = 2; i < MAX_CUSTOM + 2; i++) r = reduce(r, "b", { type: "add_dare", text: `Dare number ${i}`, proof: "photo" }, T0 + i)
+  assert.throws(() => reduce(r, "b", { type: "add_dare", text: "One too many", proof: "photo" }, T0), /Max/)
+
+  let s = reduce(r, "a", { type: "start" }, T0, () => 0)
+  const [a, b] = s.players
+  assert.equal(b.turn!.custom?.text, "Mere liye gaana gaao", "Meera gets Aarav's dare")
+  assert.equal(a.turn!.custom?.by, "b", "Aarav gets one of Meera's")
+  assert.equal(dareFor(s, b).proof, "voice")
+  assert.equal(dareFor(s, b).points, 2, "custom scores at the room's level")
+  assert.throws(() => reduce(s, "a", { type: "add_dare", text: "Too late now", proof: "voice" }, T0), /lobby/)
+  s = reduce(s, "b", { type: "complete", proof }, T0)
+  s = reduce(s, "a", { type: "skip" }, T0)
+  s = reduce(s, "a", { type: "next", round: 1 }, T0)
+  assert.equal(s.players[1].turn!.custom?.text, "Selfie bhejo smile ke saath")
+  s = reduce(s, "b", { type: "skip" }, T0)
+  s = reduce(s, "a", { type: "skip" }, T0)
+  s = reduce(s, "a", { type: "next", round: 2 }, T0)
+  assert.equal(s.players[1].turn!.custom, undefined, "Aarav's two ran out -> deck")
+  assert.ok(s.players[1].turn!.dare >= 0)
+})
+
+test("proof log keeps every round for the admin; broadcasts carry none of it", () => {
+  let r = started()
+  r = reduce(r, "a", { type: "complete", proof }, T0)
+  r = reduce(r, "b", { type: "complete", proof: { ...proof, kind: "image", caption: "hi" } }, T0)
+  r = reduce(r, "a", { type: "next", round: 1 }, T0)
+  r = reduce(r, "a", { type: "complete", proof }, T0)
+  assert.equal(r.proofs!.length, 3)
+  assert.deepEqual(r.proofs!.map((p) => [p.round, p.name]), [[1, "Aarav"], [1, "Meera"], [2, "Aarav"]])
+  assert.ok(r.proofs!.every((p) => p.dare.length > 5), "dare text saved with the proof")
+
+  const pub = redact(reduce(r, "b", { type: "skip" }, T0))
+  assert.equal(pub.redacted, true)
+  assert.deepEqual(pub.proofs, [])
+  assert.ok(pub.players.every((p) => !p.turn?.proof?.url))
+  const plain = lobby()
+  assert.equal(redact(plain), plain, "nothing private -> sent as is, no refetch needed")
 })
